@@ -30,6 +30,7 @@ module Spec
         def start(example_count)
           STDOUT.puts "Profiling enabled."
           @example_count = example_count
+          @example_times ||= []
 
           @output.puts html_header
           @output.puts report_header
@@ -63,10 +64,16 @@ module Spec
         end
 
         def example_passed(example)
+          delta_time = Time.now - @time
           STDOUT.print '.'
           STDOUT.flush
+          @example_times << [
+            example_group.description,
+            example.description,
+            delta_time
+          ]
           move_progress
-          @output.puts "    <dd class=\"spec passed\"><span class=\"passed_spec_name\">#{h(example.description)} ( in #{Time.now - @time} seconds )</span></dd>"
+          @output.puts "    <dd class=\"spec passed\"><span class=\"passed_spec_name\">#{h(example.description)} ( in #{delta_time} seconds )</span></dd>"
           @output.flush
         end
 
@@ -127,6 +134,7 @@ module Spec
         end
 
         def dump_summary(duration, example_count, failure_count, pending_count)
+          @example_times ||= []
           if dry_run?
             totals = "This was a dry-run"
           else
@@ -135,6 +143,16 @@ module Spec
           end
           @output.puts "<script type=\"text/javascript\">document.getElementById('duration').innerHTML = \"Finished in <strong>#{duration} seconds</strong>\";</script>"
           @output.puts "<script type=\"text/javascript\">document.getElementById('totals').innerHTML = \"#{totals}\";</script>"
+          unless dry_run?
+            @example_times = @example_times.sort_by do |description, example, time|
+              time
+            end.reverse
+            (0..9).each do |nb_slow|
+              description, example, time = @example_times[nb_slow]
+              @output.puts "<script type=\"text/javascript\">document.getElementById('slow_#{nb_slow}').innerHTML = \"#{description.gsub('"', '\"')} #{example.gsub('"', '\"')} ( #{time} seconds ) \";</script>"
+            end
+            @output.puts "<script type=\"text/javascript\">document.getElementById('slowest').style.display = \"block\";</script>"
+          end
           @output.puts "</div>"
           @output.puts "</div>"
           @output.puts "</body>"
@@ -188,6 +206,22 @@ EOF
     <p id="totals">&nbsp;</p>
     <p id="duration">&nbsp;</p>
   </div>
+</div>
+
+<div id="slowest" style="display:none;">
+<h2>Top 10 slowest examples</h2>
+  <dl>
+    <dd id="slow_0">&nbsp;</dd>
+    <dd id="slow_1">&nbsp;</dd>
+    <dd id="slow_2">&nbsp;</dd>
+    <dd id="slow_3">&nbsp;</dd>
+    <dd id="slow_4">&nbsp;</dd>
+    <dd id="slow_5">&nbsp;</dd>
+    <dd id="slow_6">&nbsp;</dd>
+    <dd id="slow_7">&nbsp;</dd>
+    <dd id="slow_8">&nbsp;</dd>
+    <dd id="slow_9">&nbsp;</dd>
+  </dl>
 </div>
 
 <div class="results">
